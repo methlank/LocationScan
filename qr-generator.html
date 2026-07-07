@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Label Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#14181c;
+    --paper:#f6f7f4;
+    --panel:#ffffff;
+    --line:#c9cec6;
+    --accent:#0f6f3f;
+    --mono:'Courier New', ui-monospace, monospace;
+    --sans:'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);padding:28px 16px 60px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:17px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:4px}
+  .lede{font-size:13px;color:#5a6058;margin-bottom:22px;line-height:1.5}
+  .controls{
+    border:2px solid var(--ink);
+    background:var(--panel);
+    padding:18px 16px;
+    display:grid;
+    gap:14px;
+    margin-bottom:26px;
+  }
+  label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:600;display:block;margin-bottom:5px;color:#5a6058}
+  input, textarea{
+    width:100%;
+    font-family:var(--mono);
+    font-size:14px;
+    padding:10px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  input:focus-visible, textarea:focus-visible, button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+  textarea{min-height:84px;resize:vertical}
+  .hint{font-size:12px;color:#7a8076;margin-top:5px;font-family:var(--mono)}
+  button{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:13px;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.05em;
+    cursor:pointer;
+    font-family:var(--sans);
+  }
+  button.print{background:var(--ink)}
+  .btnrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sheet{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(210px, 1fr));
+    gap:18px;
+  }
+  .qr-label{
+    border:2px solid var(--ink);
+    background:var(--panel);
+    padding:16px;
+    text-align:center;
+    page-break-inside:avoid;
+  }
+  .qr-label .qr{display:flex;justify-content:center;margin-bottom:12px}
+  .qr-label .qr img, .qr-label .qr canvas{width:160px;height:160px}
+  .qr-label .lid{
+    font-family:var(--mono);
+    font-weight:bold;
+    font-size:15px;
+    border-top:1px solid var(--line);
+    padding-top:10px;
+  }
+  .qr-label .scanme{
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:#5a6058;
+    margin-top:3px;
+  }
+  @media print{
+    .controls, h1, .lede{display:none}
+    body{background:#fff;padding:0}
+    .sheet{gap:8mm}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QR label generator</h1>
+  <p class="lede">Point the base URL at wherever you host <b>scan-tracker.html</b>, list one item ID per line, generate, then print the sheet and stick a label on each bag.</p>
+
+  <div class="controls">
+    <div>
+      <label for="base">Tracker base URL</label>
+      <input id="base" value="https://your-site.vercel.app/scan-tracker.html">
+      <div class="hint">?id=… is appended automatically for each item</div>
+    </div>
+    <div>
+      <label for="ids">Item IDs (one per line)</label>
+      <textarea id="ids">BAG-0001
+BAG-0002
+BAG-0003</textarea>
+    </div>
+    <div class="btnrow">
+      <button id="gen">Generate labels</button>
+      <button class="print" onclick="window.print()">Print sheet</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+document.getElementById("gen").addEventListener("click", () => {
+  const base = document.getElementById("base").value.trim();
+  const ids = document.getElementById("ids").value
+    .split("\n").map(s => s.trim()).filter(Boolean);
+  const sheet = document.getElementById("sheet");
+  sheet.innerHTML = "";
+
+  ids.forEach(id => {
+    const url = base + (base.includes("?") ? "&" : "?") + "id=" + encodeURIComponent(id);
+
+    const card = document.createElement("div");
+    card.className = "qr-label";
+
+    const qrBox = document.createElement("div");
+    qrBox.className = "qr";
+    card.appendChild(qrBox);
+
+    const lid = document.createElement("div");
+    lid.className = "lid";
+    lid.textContent = id;
+    card.appendChild(lid);
+
+    const scan = document.createElement("div");
+    scan.className = "scanme";
+    scan.textContent = "scan to log position";
+    card.appendChild(scan);
+
+    sheet.appendChild(card);
+
+    new QRCode(qrBox, {
+      text: url,
+      width: 160,
+      height: 160,
+      correctLevel: QRCode.CorrectLevel.H   // survives scuffed/dirty labels
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scan Checkpoint</title>
+<style>
+  :root{
+    --ink:#14181c;
+    --paper:#f6f7f4;
+    --panel:#ffffff;
+    --line:#c9cec6;
+    --accent:#0f6f3f;      /* checkpoint green */
+    --accent-ink:#ffffff;
+    --warn:#a8452a;
+    --mono:'Courier New', ui-monospace, monospace;
+    --sans:'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:24px 16px 48px;
+  }
+  .tag{
+    width:100%;
+    max-width:420px;
+  }
+  /* shipping-label header */
+  .label-head{
+    border:2px solid var(--ink);
+    background:var(--panel);
+    padding:14px 16px;
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom-width:0;
+  }
+  .label-head h1{
+    font-size:15px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  .label-head .id{
+    font-family:var(--mono);
+    font-size:14px;
+    font-weight:bold;
+  }
+  .panel{
+    border:2px solid var(--ink);
+    background:var(--panel);
+    padding:20px 16px;
+  }
+  .status{
+    text-align:center;
+    padding:18px 0 22px;
+  }
+  .status .big{
+    font-size:17px;
+    font-weight:600;
+  }
+  .status .sub{
+    font-size:13px;
+    color:#5a6058;
+    margin-top:6px;
+    line-height:1.5;
+  }
+  .pulse{
+    width:14px;height:14px;border-radius:50%;
+    background:var(--accent);
+    margin:0 auto 14px;
+    animation:pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{transform:scale(1);opacity:1}
+    50%{transform:scale(1.6);opacity:.35}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pulse{animation:none}
+  }
+  table.readout{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--mono);
+    font-size:14px;
+    display:none;
+  }
+  table.readout th{
+    text-align:left;
+    font-family:var(--sans);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#5a6058;
+    padding:9px 4px 3px;
+    border-top:1px solid var(--line);
+    font-weight:600;
+  }
+  table.readout td{
+    padding:0 4px 9px;
+    font-weight:bold;
+    word-break:break-all;
+  }
+  .stamp{
+    display:none;
+    margin:16px auto 4px;
+    width:fit-content;
+    border:3px double var(--accent);
+    color:var(--accent);
+    font-family:var(--mono);
+    font-weight:bold;
+    font-size:13px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    padding:7px 16px;
+    transform:rotate(-3deg);
+  }
+  .stamp.warn{border-color:var(--warn);color:var(--warn)}
+  a.mapbtn, button.retry{
+    display:none;
+    width:100%;
+    margin-top:16px;
+    padding:13px;
+    background:var(--accent);
+    color:var(--accent-ink);
+    text-align:center;
+    text-decoration:none;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.05em;
+    border:none;
+    cursor:pointer;
+    font-family:var(--sans);
+  }
+  button.retry{background:var(--ink)}
+  a.mapbtn:focus-visible, button.retry:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+  .foot{
+    font-family:var(--mono);
+    font-size:11px;
+    color:#7a8076;
+    text-align:center;
+    margin-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="tag">
+  <div class="label-head">
+    <h1>Scan checkpoint</h1>
+    <span class="id" id="itemId">—</span>
+  </div>
+  <div class="panel">
+    <div class="status" id="status">
+      <div class="pulse" id="pulse"></div>
+      <div class="big" id="statusBig">Getting position…</div>
+      <div class="sub" id="statusSub">Allow location access when your phone asks. The position of this phone right now is recorded as the item's position.</div>
+    </div>
+
+    <table class="readout" id="readout">
+      <tr><th>Latitude</th></tr>
+      <tr><td id="lat"></td></tr>
+      <tr><th>Longitude</th></tr>
+      <tr><td id="lon"></td></tr>
+      <tr><th>Accuracy</th></tr>
+      <tr><td id="acc"></td></tr>
+      <tr><th>Scanned at</th></tr>
+      <tr><td id="time"></td></tr>
+    </table>
+
+    <div class="stamp" id="stamp">Position logged</div>
+    <a class="mapbtn" id="mapbtn" href="#" target="_blank" rel="noopener">Open in Google Maps</a>
+    <button class="retry" id="retry">Try again</button>
+  </div>
+  <div class="foot" id="foot">outbound logistics · scan-to-locate</div>
+</div>
+
+<script>
+/* ================= CONFIGURATION =================
+   1. SHEET_ENDPOINT: paste the Google Apps Script Web App URL
+      (ends in /exec). Every scan is appended as a row to your
+      Google Sheet. Leave "" to disable logging.
+   2. Item ID comes from the QR's URL, e.g.
+      https://yoursite.vercel.app/scan-tracker.html?id=BAG-0042
+   ================================================= */
+const SHEET_ENDPOINT = "";   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+
+const params  = new URLSearchParams(location.search);
+const itemId  = params.get("id") || "UNTAGGED";
+document.getElementById("itemId").textContent = itemId;
+
+const el = id => document.getElementById(id);
+
+function showResult(pos){
+  const {latitude, longitude, accuracy} = pos.coords;
+  const t = new Date(pos.timestamp);
+
+  el("lat").textContent  = latitude.toFixed(6) + "°";
+  el("lon").textContent  = longitude.toFixed(6) + "°";
+  el("acc").textContent  = "± " + Math.round(accuracy) + " m";
+  el("time").textContent = t.toLocaleString();
+
+  el("pulse").style.display = "none";
+  el("statusBig").textContent = "Position captured";
+  el("statusSub").textContent = "This is where the item was at the moment of scanning.";
+  el("readout").style.display = "table";
+  el("stamp").style.display = "block";
+  el("mapbtn").style.display = "block";
+  el("mapbtn").href = "https://www.google.com/maps?q=" + latitude + "," + longitude;
+
+  report(latitude, longitude, accuracy, t);
+}
+
+function showError(err){
+  el("pulse").style.display = "none";
+  el("statusBig").textContent = "Couldn't get position";
+  el("statusSub").textContent =
+    err.code === 1
+      ? "Location permission was denied. Enable location for your browser in phone settings, then try again."
+      : "No GPS fix. Move away from metal roofing or thick walls and try again.";
+  const s = el("stamp");
+  s.textContent = "Not logged";
+  s.classList.add("warn");
+  s.style.display = "block";
+  el("retry").style.display = "block";
+}
+
+function locate(){
+  el("pulse").style.display = "block";
+  el("statusBig").textContent = "Getting position…";
+  el("stamp").style.display = "none";
+  el("retry").style.display = "none";
+  if(!("geolocation" in navigator)){
+    showError({code: 0});
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(showResult, showError, {
+    enableHighAccuracy: true,
+    timeout: 15000,
+    maximumAge: 0
+  });
+}
+
+async function report(lat, lon, acc, t){
+  if(!SHEET_ENDPOINT) return;   // logging disabled
+  try{
+    /* Apps Script web apps don't return CORS headers, so we send
+       a "simple" request with no-cors. The row still gets written;
+       we just can't read the response, which is fine here. */
+    await fetch(SHEET_ENDPOINT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify({
+        itemId:     itemId,
+        lat:        lat.toFixed(6),
+        lon:        lon.toFixed(6),
+        accuracy:   Math.round(acc),
+        clientTime: t.toISOString(),
+        mapUrl:     "https://www.google.com/maps?q=" + lat + "," + lon,
+        userAgent:  navigator.userAgent
+      })
+    });
+    el("foot").textContent = "logged to sheet · " + itemId;
+  }catch(e){
+    el("foot").textContent = "captured · sheet log failed (offline?)";
+  }
+}
+
+el("retry").addEventListener("click", locate);
+locate();
+</script>
+</body>
+</html>
