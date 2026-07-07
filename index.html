@@ -245,7 +245,7 @@ function locate(){
   });
 }
 
-async function report(lat, lon, acc, t){
+function report(lat, lon, acc, t){
   if(!SHEET_ENDPOINT) return;   // logging disabled
   const params = new URLSearchParams({
     itemId:     itemId,
@@ -259,34 +259,26 @@ async function report(lat, lon, acc, t){
   const sep = SHEET_ENDPOINT.includes("?") ? "&" : "?";
   const url = SHEET_ENDPOINT + sep + params.toString();
 
-  /* Try three ways in order so at least one reaches Apps Script across
-     all mobile browsers. Each follows the /exec -> googleusercontent
-     redirect that Apps Script performs. */
+  /* Load the endpoint URL inside a hidden iframe. This performs the exact
+     same request as visiting the URL directly in the browser (which is
+     confirmed to write a row), including following Apps Script's redirect
+     to googleusercontent.com. Works on mobile where background fetch was
+     being dropped. */
   try {
-    // 1) plain GET; Apps Script allows simple cross-origin GETs
-    await fetch(url, { method: "GET", redirect: "follow" });
+    const frame = document.createElement("iframe");
+    frame.style.display = "none";
+    frame.src = url;
+    document.body.appendChild(frame);
+
+    // also fire a fetch as a parallel attempt (harmless if it fails)
+    try { fetch(url, { method: "GET", mode: "no-cors", keepalive: true }); } catch(_) {}
+
     el("foot").textContent = "logged to sheet · " + itemId;
-    return;
-  } catch(e1) {
-    try {
-      // 2) opaque GET (can't read result, but request still sent + followed)
-      await fetch(url, { method: "GET", mode: "no-cors", redirect: "follow" });
-      el("foot").textContent = "logged to sheet · " + itemId;
-      return;
-    } catch(e2) {
-      try {
-        // 3) last resort: image beacon
-        await new Promise((res) => {
-          const img = new Image();
-          img.onload = res; img.onerror = res;
-          img.src = url;
-          setTimeout(res, 8000);
-        });
-        el("foot").textContent = "logged to sheet · " + itemId;
-      } catch(e3) {
-        el("foot").textContent = "captured · sheet log failed (offline?)";
-      }
-    }
+
+    // clean up the iframe after it's had time to complete
+    setTimeout(() => { try { frame.remove(); } catch(_){} }, 10000);
+  } catch(e) {
+    el("foot").textContent = "captured · sheet log failed (offline?)";
   }
 }
 
