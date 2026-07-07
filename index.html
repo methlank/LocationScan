@@ -246,7 +246,17 @@ function locate(){
 }
 
 function report(lat, lon, acc, t){
-  if(!SHEET_ENDPOINT) return;   // logging disabled
+  if(!SHEET_ENDPOINT){ markLogged(); return; }
+
+  // If we've already come BACK from logging, don't log again.
+  if(new URLSearchParams(location.search).get("logged") === "1"){
+    markLogged();
+    return;
+  }
+
+  const back = location.origin + location.pathname +
+               "?id=" + encodeURIComponent(itemId) + "&logged=1";
+
   const params = new URLSearchParams({
     itemId:     itemId,
     lat:        lat.toFixed(6),
@@ -254,32 +264,21 @@ function report(lat, lon, acc, t){
     accuracy:   Math.round(acc),
     clientTime: t.toISOString(),
     mapUrl:     "https://www.google.com/maps?q=" + lat + "," + lon,
-    userAgent:  navigator.userAgent
+    userAgent:  navigator.userAgent,
+    redirect:   back
   });
   const sep = SHEET_ENDPOINT.includes("?") ? "&" : "?";
   const url = SHEET_ENDPOINT + sep + params.toString();
 
-  /* Load the endpoint URL inside a hidden iframe. This performs the exact
-     same request as visiting the URL directly in the browser (which is
-     confirmed to write a row), including following Apps Script's redirect
-     to googleusercontent.com. Works on mobile where background fetch was
-     being dropped. */
-  try {
-    const frame = document.createElement("iframe");
-    frame.style.display = "none";
-    frame.src = url;
-    document.body.appendChild(frame);
+  // Full-page navigation: this is the exact request that works when you
+  // open the URL directly. Apps Script writes the row, then redirects the
+  // browser back here with &logged=1, where we show the confirmation.
+  el("statusBig").textContent = "Saving…";
+  window.location.href = url;
+}
 
-    // also fire a fetch as a parallel attempt (harmless if it fails)
-    try { fetch(url, { method: "GET", mode: "no-cors", keepalive: true }); } catch(_) {}
-
-    el("foot").textContent = "logged to sheet · " + itemId;
-
-    // clean up the iframe after it's had time to complete
-    setTimeout(() => { try { frame.remove(); } catch(_){} }, 10000);
-  } catch(e) {
-    el("foot").textContent = "captured · sheet log failed (offline?)";
-  }
+function markLogged(){
+  el("foot").textContent = "logged to sheet · " + itemId;
 }
 
 el("retry").addEventListener("click", locate);
