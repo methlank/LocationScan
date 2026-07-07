@@ -187,7 +187,7 @@
    2. Item ID comes from the QR's URL, e.g.
       https://yoursite.vercel.app/scan-tracker.html?id=BAG-0042
    ================================================= */
-const SHEET_ENDPOINT = "";   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbzUGqnYUC0CK0R18ZndWY0UDqrMkB0NGbZH-NxCGPpIUXri9ZOAryvDdecHo6AJoQkeJQ/exec";   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
 
 const params  = new URLSearchParams(location.search);
 const itemId  = params.get("id") || "UNTAGGED";
